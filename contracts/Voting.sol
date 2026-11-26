@@ -88,7 +88,7 @@ contract Voting is IForwarder, AragonApp {
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata, uint256 minBalance, uint256 minTime, uint256 totalSupply, uint256 creatorVotingPower);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
-    event ExecutionVetoed(uint256 indexed voteId, address indexed guardian, bytes32 reasonHash);
+    event VoteVetoed(uint256 indexed voteId, address indexed guardian);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
 
@@ -316,10 +316,10 @@ contract Voting is IForwarder, AragonApp {
     }
 
     /// @notice Permanently block execution of an open vote. Ballots remain open until the usual deadline.
-    function vetoExecution(uint256 _voteId, bytes32 _reasonHash) external voteExists(_voteId) authP(VETO_EXECUTION_ROLE, arr(_voteId)) {
+    function vetoVote(uint256 _voteId) external voteExists(_voteId) authP(VETO_EXECUTION_ROLE, arr(_voteId)) {
         require(_isVoteOpen(votes[_voteId]) && !executionVetoed[_voteId], "VOTING_CANNOT_VETO");
         executionVetoed[_voteId] = true;
-        emit ExecutionVetoed(_voteId, msg.sender, _reasonHash);
+        emit VoteVetoed(_voteId, msg.sender);
     }
 
     // Forwarding fns

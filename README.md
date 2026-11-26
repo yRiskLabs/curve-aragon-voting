@@ -1,15 +1,9 @@
 ### Curve Voting(Aragon Voting fork)
 
-[Voting.sol](contracts/Voting.sol)
+[Voting.sol](https://github.com/curvefi/curve-aragon-voting/blob/master/contracts/Voting.sol)
 [SPECS](https://github.com/curvefi/curve-aragon-voting/blob/master/SPECS.md)
 
 [Audit](https://github.com/curvefi/curve-aragon-voting/blob/master/CURVE-VOTING-SMART-CONTRACT%20Certificate.pdf)
-
-## Guardian veto
-
-A holder of `VETO_EXECUTION_ROLE` can call `vetoExecution(voteId, reasonHash)` strictly before the vote's closing timestamp. A veto permanently blocks that proposal's script. Ballots, including weighted votes relayed by Convex, continue to count until the scheduled close. Integrations can read `executionVetoed(voteId)` or listen for `ExecutionVetoed` to show the veto while voting is still open.
-
-Governance grants the role separately on each Voting proxy. For a prospective, fixed-term mandate, use an Aragon parameterized permission requiring both `voteId >= firstEligibleId` (argument 0) and `block.timestamp < termEnd` (the ACL's timestamp parameter). Take the first eligible ID from that proxy's `votesLength` at activation. An unrestricted grant covers every open vote and lasts until revoked. The upstream audit linked above predates this change.
 
 ## Description
 

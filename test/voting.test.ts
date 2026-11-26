@@ -160,7 +160,6 @@ describe("Voting", function () {
     });
 
     describe("when vetoing execution", () => {
-      const reason = utils.id("incorrect proposal target");
       let guardian: Voting;
       let role: string;
       let close: number;
@@ -174,12 +173,12 @@ describe("Voting", function () {
 
       it("blocks only the vetoed script and leaves the ballot open", async () => {
         const before = await voting.getVote(voteId);
-        await expect(voting.vetoExecution(voteId, reason)).to.be.revertedWith("APP_AUTH_FAILED");
-        await expect(guardian.vetoExecution(await voting.votesLength(), reason)).to.be.revertedWith("VOTING_NO_VOTE");
-        await expect(guardian.vetoExecution(voteId, reason))
-          .to.emit(voting, "ExecutionVetoed").withArgs(voteId, signers[3].address, reason);
+        await expect(voting.vetoVote(voteId)).to.be.revertedWith("APP_AUTH_FAILED");
+        await expect(guardian.vetoVote(await voting.votesLength())).to.be.revertedWith("VOTING_NO_VOTE");
+        await expect(guardian.vetoVote(voteId))
+          .to.emit(voting, "VoteVetoed").withArgs(voteId, signers[3].address);
         expect(await voting.executionVetoed(voteId)).to.equal(true);
-        await expect(guardian.vetoExecution(voteId, reason)).to.be.revertedWith("VOTING_CANNOT_VETO");
+        await expect(guardian.vetoVote(voteId)).to.be.revertedWith("VOTING_CANNOT_VETO");
         expect(await voting.getVote(voteId)).to.deep.equal(before);
         expect(await voting.canVote(voteId, voter.address)).to.equal(true);
         await increase(voteTime.toString());
@@ -193,7 +192,7 @@ describe("Voting", function () {
 
       for (const entry of ["vote", "votePct"]) {
         it(`counts a weighted ballot via ${entry} after the veto`, async () => {
-          await guardian.vetoExecution(voteId, reason);
+          await guardian.vetoVote(voteId);
           const yes = pct16("99.67");
           const no = pct16("0.33");
           const before = await voting.getVote(voteId);
@@ -216,7 +215,7 @@ describe("Voting", function () {
       it("allows a veto one second before close even with unanimous snapshot support", async () => {
         await voting.connect(voter).vote(voteId, true, true);
         await ethers.provider.send("evm_setNextBlockTimestamp", [close - 1]);
-        await guardian.vetoExecution(voteId, reason);
+        await guardian.vetoVote(voteId);
         await increase("1");
         expect(await voting.canExecute(voteId)).to.equal(false);
         await expect(voting.executeVote(voteId)).to.be.revertedWith("VOTING_CAN_NOT_EXECUTE");
@@ -224,11 +223,11 @@ describe("Voting", function () {
 
       it("ends the veto at the exact closing timestamp and allows execution", async () => {
         await ethers.provider.send("evm_setNextBlockTimestamp", [close]);
-        await expect(guardian.vetoExecution(voteId, reason, { gasLimit: 500000 })).to.be.revertedWith("VOTING_CANNOT_VETO");
+        await expect(guardian.vetoVote(voteId, { gasLimit: 500000 })).to.be.revertedWith("VOTING_CANNOT_VETO");
         expect((await ethers.provider.getBlock("latest")).timestamp).to.equal(close);
         expect(await voting.canExecute(voteId)).to.equal(true);
         await voting.executeVote(voteId);
-        await expect(guardian.vetoExecution(voteId, reason)).to.be.revertedWith("VOTING_CANNOT_VETO");
+        await expect(guardian.vetoVote(voteId)).to.be.revertedWith("VOTING_CANNOT_VETO");
       });
 
       it("honors a first eligible ID and an expiring grant on the Aragon ACL", async () => {
@@ -242,11 +241,11 @@ describe("Voting", function () {
           param(0, 5, first), // voteId >= first
           param(201, 4, expiry), // block.timestamp < expiry
         ]);
-        await expect(guardian.vetoExecution(voteId, reason)).to.be.revertedWith("APP_AUTH_FAILED");
+        await expect(guardian.vetoVote(voteId)).to.be.revertedWith("APP_AUTH_FAILED");
         await voting.connect(voter)["newVote(bytes,string)"]("0x00000001", "");
-        await guardian.callStatic.vetoExecution(first, reason);
+        await guardian.callStatic.vetoVote(first);
         await ethers.provider.send("evm_setNextBlockTimestamp", [expiry]);
-        await expect(guardian.vetoExecution(first, reason, { gasLimit: 500000 })).to.be.revertedWith("APP_AUTH_FAILED");
+        await expect(guardian.vetoVote(first, { gasLimit: 500000 })).to.be.revertedWith("APP_AUTH_FAILED");
         expect((await voting.getVote(first)).open).to.equal(true);
       });
     });
