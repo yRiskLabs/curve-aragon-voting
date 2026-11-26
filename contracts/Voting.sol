@@ -20,7 +20,7 @@ contract Voting is IForwarder, AragonApp {
     uint128 private constant MAX_UINT_64 = 2 ** 64 - 1;
 
     bytes32 public constant CREATE_VOTES_ROLE = 0xe7dcd7275292e064d090fbc5f3bd7995be23b502c1fed5cd94cfddbbdcd32bbc; //keccak256("CREATE_VOTES_ROLE");
-    bytes32 public constant VETO_EXECUTION_ROLE = keccak256("VETO_EXECUTION_ROLE");
+    bytes32 public constant VETO_VOTES_ROLE = keccak256("VETO_VOTES_ROLE");
     bytes32 public constant MODIFY_SUPPORT_ROLE = 0xda3972983e62bdf826c4b807c4c9c2b8a941e1f83dfa76d53d6aeac11e1be650; //keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = 0xad15e7261800b4bb73f1b69d3864565ffb1fd00cb93cf14fe48da8f1f2149f39; //keccak256("MODIFY_QUORUM_ROLE");
 
@@ -83,7 +83,7 @@ contract Voting is IForwarder, AragonApp {
     uint256 public votesLength;
 
     mapping(address => uint256) public lastCreateVoteTimes;
-    mapping(uint256 => bool) public executionVetoed;
+    mapping(uint256 => bool) public isVoteVetoed;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata, uint256 minBalance, uint256 minTime, uint256 totalSupply, uint256 creatorVotingPower);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
@@ -316,9 +316,9 @@ contract Voting is IForwarder, AragonApp {
     }
 
     /// @notice Permanently block execution of an open vote. Ballots remain open until the usual deadline.
-    function vetoVote(uint256 _voteId) external voteExists(_voteId) authP(VETO_EXECUTION_ROLE, arr(_voteId)) {
-        require(_isVoteOpen(votes[_voteId]) && !executionVetoed[_voteId], "VOTING_CANNOT_VETO");
-        executionVetoed[_voteId] = true;
+    function vetoVote(uint256 _voteId) external voteExists(_voteId) authP(VETO_VOTES_ROLE, arr(_voteId)) {
+        require(_isVoteOpen(votes[_voteId]) && !isVoteVetoed[_voteId], "VOTING_CANNOT_VETO");
+        isVoteVetoed[_voteId] = true;
         emit VoteVetoed(_voteId, msg.sender);
     }
 
@@ -538,7 +538,7 @@ contract Voting is IForwarder, AragonApp {
             return false;
         }
 
-        if (vote_.executed || executionVetoed[_voteId]) {
+        if (vote_.executed || isVoteVetoed[_voteId]) {
             return false;
         }
 
