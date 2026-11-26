@@ -38,11 +38,6 @@ const config: HardhatUserConfig = {
         params: [],
       },
       {
-        name: "Veto execution of an open vote",
-        id: "VETO_EXECUTION_ROLE",
-        params: ["Vote ID"],
-      },
-      {
         name: "Modify support",
         id: "MODIFY_SUPPORT_ROLE",
         params: ["New support", "Current support"],
