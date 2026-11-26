@@ -20,6 +20,7 @@ contract Voting is IForwarder, AragonApp {
     uint128 private constant MAX_UINT_64 = 2 ** 64 - 1;
 
     bytes32 public constant CREATE_VOTES_ROLE = 0xe7dcd7275292e064d090fbc5f3bd7995be23b502c1fed5cd94cfddbbdcd32bbc; //keccak256("CREATE_VOTES_ROLE");
+    bytes32 public constant CANCEL_VOTE_ROLE = keccak256("CANCEL_VOTE_ROLE");
     bytes32 public constant MODIFY_SUPPORT_ROLE = 0xda3972983e62bdf826c4b807c4c9c2b8a941e1f83dfa76d53d6aeac11e1be650; //keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = 0xad15e7261800b4bb73f1b69d3864565ffb1fd00cb93cf14fe48da8f1f2149f39; //keccak256("MODIFY_QUORUM_ROLE");
 
@@ -57,6 +58,7 @@ contract Voting is IForwarder, AragonApp {
         uint256 votingPower;
         bytes executionScript;
         mapping (address => VoterState) voters;
+        bool canceled; // Appended for compatibility with votes stored by existing proxies.
     }
 
     MiniMeToken public token;
@@ -86,6 +88,7 @@ contract Voting is IForwarder, AragonApp {
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata, uint256 minBalance, uint256 minTime, uint256 totalSupply, uint256 creatorVotingPower);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
+    event CancelVote(uint256 indexed voteId, address indexed guardian, bytes32 reasonHash);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
 
@@ -312,6 +315,18 @@ contract Voting is IForwarder, AragonApp {
         _executeVote(_voteId);
     }
 
+    /// @notice Cancel an open vote, recording the hash of the guardian's reason.
+    function cancelVote(uint256 _voteId, bytes32 _reasonHash) external voteExists(_voteId) authP(CANCEL_VOTE_ROLE, arr(_voteId)) {
+        Vote storage vote_ = votes[_voteId];
+        require(_isVoteOpen(vote_), "VOTING_VOTE_NOT_OPEN");
+        vote_.canceled = true;
+        emit CancelVote(_voteId, msg.sender, _reasonHash);
+    }
+
+    function isVoteCanceled(uint256 _voteId) external view voteExists(_voteId) returns (bool) {
+        return votes[_voteId].canceled;
+    }
+
     // Forwarding fns
 
     /**
@@ -528,7 +543,7 @@ contract Voting is IForwarder, AragonApp {
             return false;
         }
 
-        if (vote_.executed) {
+        if (vote_.executed || vote_.canceled) {
             return false;
         }
 
@@ -568,7 +583,7 @@ contract Voting is IForwarder, AragonApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed;
+        return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed && !vote_.canceled;
     }
 
     /**

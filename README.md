@@ -1,9 +1,15 @@
 ### Curve Voting(Aragon Voting fork)
 
-[Voting.sol](https://github.com/curvefi/curve-aragon-voting/blob/master/contracts/Voting.sol)
+[Voting.sol](contracts/Voting.sol)
 [SPECS](https://github.com/curvefi/curve-aragon-voting/blob/master/SPECS.md)
 
 [Audit](https://github.com/curvefi/curve-aragon-voting/blob/master/CURVE-VOTING-SMART-CONTRACT%20Certificate.pdf)
+
+## Guardian veto
+
+A holder of `CANCEL_VOTE_ROLE` can call `cancelVote(voteId, reasonHash)` strictly before the vote's closing timestamp. Cancellation closes voting and permanently blocks execution for that ID. Read `isVoteCanceled(voteId)` for its status and the `CancelVote` event for the guardian and reason hash. The original script, ballots and tallies stay available.
+
+Governance grants the role separately on each Voting proxy. For a prospective, fixed-term mandate, use an Aragon parameterized permission requiring both `voteId >= firstEligibleId` (argument 0) and `block.timestamp < termEnd` (the ACL's timestamp parameter). Take the first eligible ID from that proxy's `votesLength` at activation. An unrestricted grant covers every open vote and lasts until revoked. The upstream audit linked above predates this change.
 
 ## Description
 

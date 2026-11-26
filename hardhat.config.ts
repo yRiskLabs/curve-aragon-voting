@@ -38,6 +38,11 @@ const config: HardhatUserConfig = {
         params: [],
       },
       {
+        name: "Cancel an open vote",
+        id: "CANCEL_VOTE_ROLE",
+        params: ["Vote ID"],
+      },
+      {
         name: "Modify support",
         id: "MODIFY_SUPPORT_ROLE",
         params: ["New support", "Current support"],

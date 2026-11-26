@@ -159,6 +159,82 @@ describe("Voting", function () {
       );
     });
 
+    describe("when canceling a vote", () => {
+      const reason = utils.id("incorrect proposal target");
+      let guardian: Voting;
+      let role: string;
+      let close: number;
+
+      beforeEach(async () => {
+        guardian = voting.connect(signers[3]);
+        role = await voting.CANCEL_VOTE_ROLE();
+        await acl.createPermission(signers[3].address, voting.address, role, root.address);
+        close = (await voting.getVote(voteId)).startDate.toNumber() + voteTime;
+      });
+
+      it("closes only the canceled vote and preserves its ballots and script", async () => {
+        const before = await voting.getVote(voteId);
+        await expect(voting.cancelVote(voteId, reason)).to.be.revertedWith("APP_AUTH_FAILED");
+        await expect(guardian.cancelVote(await voting.votesLength(), reason)).to.be.revertedWith("VOTING_NO_VOTE");
+        await expect(guardian.cancelVote(voteId, reason))
+          .to.emit(voting, "CancelVote").withArgs(voteId, signers[3].address, reason);
+        const after = await voting.getVote(voteId);
+        expect(after.open).to.equal(false);
+        expect(after.executed).to.equal(false);
+        expect(after.yea).to.equal(before.yea);
+        expect(after.nay).to.equal(before.nay);
+        expect(after.script).to.equal(before.script);
+        expect(await voting.isVoteCanceled(voteId)).to.equal(true);
+        expect(await voting.canVote(voteId, voter.address)).to.equal(false);
+        await expect(guardian.cancelVote(voteId, reason)).to.be.revertedWith("VOTING_VOTE_NOT_OPEN");
+        await expect(voting.connect(voter).vote(voteId, true, true)).to.be.revertedWith("VOTING_CAN_NOT_VOTE");
+        await expect(voting.connect(voter).votePct(voteId, pct16(100), 0, true)).to.be.revertedWith("VOTING_CAN_NOT_VOTE");
+        await increase(voteTime.toString());
+        expect(await voting.canExecute(voteId)).to.equal(false);
+        await expect(voting.executeVote(voteId)).to.be.revertedWith("VOTING_CAN_NOT_EXECUTE");
+        expect(await executionTarget.counter()).to.equal(0);
+        await voting.executeVote(0);
+        expect(await executionTarget.counter()).to.equal(1);
+      });
+
+      it("allows cancellation one second before close even with unanimous snapshot support", async () => {
+        await voting.connect(voter).vote(voteId, true, true);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [close - 1]);
+        await guardian.cancelVote(voteId, reason);
+        await increase("1");
+        expect(await voting.canExecute(voteId)).to.equal(false);
+        await expect(voting.executeVote(voteId)).to.be.revertedWith("VOTING_CAN_NOT_EXECUTE");
+      });
+
+      it("ends the veto at the exact closing timestamp and allows execution", async () => {
+        await ethers.provider.send("evm_setNextBlockTimestamp", [close]);
+        await expect(guardian.cancelVote(voteId, reason, { gasLimit: 500000 })).to.be.revertedWith("VOTING_VOTE_NOT_OPEN");
+        expect((await ethers.provider.getBlock("latest")).timestamp).to.equal(close);
+        expect(await voting.canExecute(voteId)).to.equal(true);
+        await voting.executeVote(voteId);
+        await expect(guardian.cancelVote(voteId, reason)).to.be.revertedWith("VOTING_VOTE_NOT_OPEN");
+      });
+
+      it("honors a first eligible ID and an expiring grant on the Aragon ACL", async () => {
+        const first = await voting.votesLength();
+        const expiry = close - 100;
+        // ACL packs [parameter ID:8 | operator:8 | value:240]. AND combines rules 1 and 2.
+        const param = (id: number, op: number, value: BigNumber | number) =>
+          BigNumber.from(id).shl(248).or(BigNumber.from(op).shl(240)).or(value);
+        await acl.grantPermissionP(signers[3].address, voting.address, role, [
+          param(204, 9, BigNumber.from(2).shl(32).or(1)), // AND
+          param(0, 5, first), // voteId >= first
+          param(201, 4, expiry), // block.timestamp < expiry
+        ]);
+        await expect(guardian.cancelVote(voteId, reason)).to.be.revertedWith("APP_AUTH_FAILED");
+        await voting.connect(voter)["newVote(bytes,string)"]("0x00000001", "");
+        await guardian.callStatic.cancelVote(first, reason);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [expiry]);
+        await expect(guardian.cancelVote(first, reason, { gasLimit: 500000 })).to.be.revertedWith("APP_AUTH_FAILED");
+        expect((await voting.getVote(first)).open).to.equal(true);
+      });
+    });
+
     describe("when casting a vote", () => {
       let voterVoting: Voting;
 
