@@ -7,7 +7,7 @@
 
 ## Guardian veto
 
-A holder of `CANCEL_VOTE_ROLE` can call `cancelVote(voteId, reasonHash)` strictly before the vote's closing timestamp. Cancellation closes voting and permanently blocks execution for that ID. Read `isVoteCanceled(voteId)` for its status and the `CancelVote` event for the guardian and reason hash. The original script, ballots and tallies stay available.
+A holder of `VETO_EXECUTION_ROLE` can call `vetoExecution(voteId, reasonHash)` strictly before the vote's closing timestamp. A veto permanently blocks that proposal's script. Ballots, including weighted votes relayed by Convex, continue to count until the scheduled close. Integrations can read `executionVetoed(voteId)` or listen for `ExecutionVetoed` to show the veto while voting is still open.
 
 Governance grants the role separately on each Voting proxy. For a prospective, fixed-term mandate, use an Aragon parameterized permission requiring both `voteId >= firstEligibleId` (argument 0) and `block.timestamp < termEnd` (the ACL's timestamp parameter). Take the first eligible ID from that proxy's `votesLength` at activation. An unrestricted grant covers every open vote and lasts until revoked. The upstream audit linked above predates this change.
 
